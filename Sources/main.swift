@@ -1,4 +1,4 @@
-// PrivMX Chatee Client
+// PrivMX Endpoint Minimal Swift
 // Copyright © 2024 Simplito sp. z o.o.
 //
 // This file is project demonstrating usage of PrivMX Platform (https://privmx.cloud).
