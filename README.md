@@ -2,7 +2,7 @@
 
 This is a console App in Swift demonstrating the usage of Threads module in PrivMX Endpoint Swift Library.
 
-To utilize this application, you must install Chatee Server and PrivMX Bridge on your local infrastructure. For detailed installation instructions, refer to the [Privmx Bridge](https://github.com/simplito/privmx-bridge).
+To utilize this application, you must install PrivMX Bridge on your local infrastructure. For detailed installation instructions, refer to the [Privmx Bridge](https://github.com/simplito/privmx-bridge).
 To make use of this example You need a Solution, a Context within it and a user that has been added to that Context on the PrivMX Bridge.
 See the Endpoint Documentation for relevant instructions.
 
