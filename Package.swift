@@ -7,7 +7,7 @@ let package = Package(
     name: "single-file-command-line-swift-thread-example",
 	platforms: [.macOS(.v14)],
     dependencies: [
-		.package(url: "https://github.com/simplito/privmx-endpoint-swift", .upToNextMajor(from: .init(1, 6, 0)))
+		.package(url: "https://github.com/simplito/privmx-endpoint-swift", .upToNextMajor(from: .init(2, 0, 0)))
     ],
     targets: [
         .executableTarget(
