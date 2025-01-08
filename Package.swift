@@ -9,7 +9,8 @@ let package = Package(
 	
     dependencies: [
 		.package(
-			path: "../privmx-endpoint-swift-extra"
+			url: "https://github.com/simplito/privmx-endpoint-swift-extra",
+			.upToNextMinor(from:.init(2, 1, 0,prereleaseIdentifiers: ["rc4"]))
 		),
 		.package(
 			url: "https://github.com/simplito/privmx-endpoint-swift",
