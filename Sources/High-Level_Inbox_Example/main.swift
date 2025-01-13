@@ -14,8 +14,6 @@ import PrivMXEndpointSwift
 import PrivMXEndpointSwiftExtra
 import PrivMXEndpointSwiftNative
 
-// The wrapper uses Cpp types like std::string (which is imported as std.string or std.__1.string in swift)
-
 typealias UserWithPubKey = privmx.endpoint.core.UserWithPubKey  //for brevity
 typealias PagingQuery = privmx.endpoint.core.PagingQuery  //for brevity
 
@@ -79,11 +77,10 @@ guard
 		managedBy: usersWithPublicKeys,
 		withPublicMeta: publicMeta,
 		withPrivateMeta: privateMeta,
-		withFilesConfig: privmx.endpoint.inbox.FilesConfig(
-			minCount: 1,
-			maxCount: 1,
-			maxFileSize: 64,
-			maxWholeUploadSize: 128),
+		withFilesConfig: privmx.endpoint.inbox.FilesConfig(minCount: 1,
+														   maxCount: 1,
+														   maxFileSize: 64,
+														   maxWholeUploadSize: 128),
 		withPolicies: nil)
 else { exit(4) }
 
@@ -108,9 +105,9 @@ for e in entries.readItems {
 
 // An entry can contain no files, but for the sake of this example we'll send one from a buffer
 let fileToSend = Data("test buffer data".utf8)
+let messageToSend = Data("This is an entry sent @ \(Date.now)".utf8)
 
-// Alternatively we could use a `FileHandleDataSource` instance that uses a file from the disk
-// insetad
+// Alternatively we could use a `FileHandleDataSource` instance that uses a file from the disk insetad
 files.append(
 	BufferDataSource(
 		buffer: fileToSend,
@@ -124,7 +121,7 @@ guard
 	var entryHandler = try? InboxEntryHandler.prepareInboxEntryHandler(
 		using: inboxApi,  // instance of PrivMXInbox
 		in: inboxId,  // id of the Inbox to which the Entry will be sent
-		containing: Data("This is an entry".utf8),  // Data sent in the entry
+		containing: messageToSend,  // Data sent in the entry
 		sending: files,  // List of files to send
 		as: userPK)  // as who will the inbox entry be created
 else { exit(6) }
@@ -161,13 +158,13 @@ let eid :privmx.endpoint.inbox.InboxEntry? = entries2.readItems.first
 let fileID = eid?.files.first?.id
 
 
-var downloadedData:Data
+var downloadedData:Data = Data()
 
 // There are 2 ways to download provided by the high-level wrapper: using an async PrivMXEndpoint method, or by creating the handler directly
 // For the sake of this example, we'll be using the async method and waiting for it to execute
 var semaphore = DispatchSemaphore(value: 0)
 Task{
-	downloadedData = (try? await endpoint.startDownloadingToBufferFromInbox(from: fileID)) ?? Data("Errors Occured".utf8)
+	downloadedData = (try? await endpoint.startDownloadingToBufferFromInbox(from: fileID!)) ?? Data("Errors Occured".utf8)
 	semaphore.signal()
 }
 semaphore.wait()

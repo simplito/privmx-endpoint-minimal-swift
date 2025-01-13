@@ -143,7 +143,7 @@ repeat{
 	downloadedData.append(chunk)
 }while chunk.count == 512
 
-try inboxApi.closeFile(fileHandle: fileHandle)
+_ = try inboxApi.closeFile(fileHandle: fileHandle)
 
 print(downloadedData)
 

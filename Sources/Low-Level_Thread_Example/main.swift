@@ -83,7 +83,7 @@ print("New message id: ", String(newMessageId)) // the id of newly created messa
 //now we retrieve the list of messages, which includes the newly sent message.
 // this returns a threadMessagesList structure, that contains a vector of threadMessages, as well as the total number of messages in thread
 guard let messagesList = try? threadApi.listMessages(threadId: newThreadId,
-													 query: PagingQuery(skip: 0,
+													 pagingQuery: PagingQuery(skip: 0,
 																	  limit: 10,
 																	  sortOrder: "desc",
 																	  lastId: nil
