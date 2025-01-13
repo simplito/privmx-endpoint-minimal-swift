@@ -30,13 +30,13 @@ let solutionID: std.string = "TheIdOfYourSolutionGoesHere" // The Id of your Sol
 let bridgeURL: std.string = "Address.Of.The.Bridge/GoesHere" // The address of the Platform
 
 // The static method Connection.connect(userPrivKey:solutionId:bridgeUrl:) returns a connection object, that is required to initialise other modules
-guard var connection = try? Connection.connect(userPrivKey: userPK, solutionId: solutionID, bridgeUrl: bridgeURL) as? Connection
+guard var connection = try? Connection.connect(userPrivKey: userPK, solutionId: solutionID, bridgeUrl: bridgeURL)
 else {exit(1)}
 
 
 // ThreadApi instance is initialised with a connection, passed as an inout argument
 // ThreadApi is used for creating threads as well as reading and creating messages within threads
-guard let threadApi = try? ThreadApi.create(connection: &connection) else {exit(1)}
+guard let storeApi = try? StoreApi.create(connection: &connection) else {exit(1)}
 
 // CryptoApi allows for cryptographic operations
 let cryptoApi = CryptoApi.create()
@@ -60,7 +60,7 @@ usersWithPublicKeys.push_back(UserWithPubKey(userId: userId,
 guard let privateMeta = "My Example Thread".data(using: .utf8) else {exit(1)}
 let publicMeta = Data()
 
-guard let newThreadId = try? threadApi.createThread(
+guard let newStoreId = try? storeApi.createStore(
 	contextId: contextID,
 	users: usersWithPublicKeys,
 	managers: usersWithPublicKeys,
@@ -68,37 +68,52 @@ guard let newThreadId = try? threadApi.createThread(
 	privateMeta: privateMeta.asBuffer())  else {exit(1)}
 
 
-let messageToSend = "Hello World @ \(Date.now) !"
-guard let messageAsBuffer = messageToSend.data(using: .utf8)?.asBuffer() else {exit(1)}
+let fileToSend = Data(String(repeating: "#", count: 1024).utf8)
 
-// this creates a new message in the specified thread, in this case the newly created one
-// the returned string is the messageId of th enewly created message
-let newMessageId = try! threadApi.sendMessage(threadId: newThreadId, // thread in whech the message is sent
-											 publicMeta: privmx.endpoint.core.Buffer(), // metadata that wont be encrypted, we don't need it for now
-											 privateMeta: privmx.endpoint.core.Buffer(), // metadata that will be encryopted, we don't need it for now
-											 data: messageAsBuffer)
+let writeFileHandle = try storeApi.createFile(storeId: newStoreId,
+											  publicMeta: privmx.endpoint.core.Buffer(),
+											  privateMeta: privmx.endpoint.core.Buffer(),
+											  size: 1024)
+var buffer = fileToSend
+// with an entry handle we can start sending a file
+while !buffer.isEmpty {
+	// For the sake of the example we will send the file in 256 byte chunks, normally the chunks are much bigger
+	let chunk = Data(buffer.prefix(256))
+	
+	try storeApi.writeToFile(handle: writeFileHandle, dataChunk: chunk.asBuffer())
+	buffer = buffer.advanced(by: min(256,buffer.count))
+}
 
-print("New message id: ", String(newMessageId)) // the id of newly created message
+let newFileID = try storeApi.closeFile(handle: writeFileHandle)
 
 //now we retrieve the list of messages, which includes the newly sent message.
-// this returns a threadMessagesList structure, that contains a vector of threadMessages, as well as the total number of messages in thread
-guard let messagesList = try? threadApi.listMessages(threadId: newThreadId,
-													 query: PagingQuery(skip: 0,
+// this returns a FileList structure, that contains a vector of Files, as well as the total number of messages in thread
+guard let filesList = try? storeApi.listFiles(storeId: newStoreId,
+													 pagingQuery: PagingQuery(skip: 0,
 																	  limit: 10,
 																	  sortOrder: "desc",
 																	  lastId: nil
 																	 )) else {exit(1)}
 
 
-// at last, we print out the messages we retrieved, including the newly sent one
-for message in messagesList.readItems{
-	print(message.info.messageId, message.data)
-}
+guard let fileId = filesList.readItems.first?.info.fileId else {exit(1)}
+var downloadedData: Data = Data()
 
-	
-	
-	
-	// This is the helper extension for converting Data to privmx.endpoint.core.Buffer
+
+let fileHandle = try storeApi.openFile(fileId: fileId)
+
+var chunk = Data()
+
+repeat{
+	chunk = try Data(from: storeApi.readFromFile(handle: fileHandle, length: 512))
+	downloadedData.append(chunk)
+}while chunk.count == 512
+
+_ = try storeApi.closeFile(handle: fileHandle)
+
+print(downloadedData)
+
+// This is the helper extension for converting Data to privmx.endpoint.core.Buffer and back
 extension Data {
 	/// Helper, that returns contents of this instance as `privmx.endpoint.core.Buffer`
 	/// - Returns: Buffer
@@ -109,4 +124,14 @@ extension Data {
 		return resultCppString
 	}
 	
+	public init(from buffer: privmx.endpoint.core.Buffer) throws {
+		guard let cDataPtr = buffer.__dataUnsafe() else {
+			var err = privmx.InternalError()
+			err.name = "Data Error"
+			err.message = "Data was nil"
+			throw PrivMXEndpointError.otherFailure(err)
+		}
+		let dataSize = buffer.size()
+		self.init(bytes: cDataPtr, count: dataSize)
+	}
 }
