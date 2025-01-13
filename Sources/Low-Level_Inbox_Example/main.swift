@@ -20,10 +20,10 @@ typealias UserWithPubKey = privmx.endpoint.core.UserWithPubKey //for brevity
 typealias PagingQuery = privmx.endpoint.core.PagingQuery //for brevity
 
 
-	// The certificates are added as a resource for this package, should you prefer to use your own, you need to specify the appropriate path
-	//let certPath:std.string = std.string(Bundle.module.path(forResource: "cacert", ofType: ".pem"))
-	
-	//try! Connection.setCertsPath(certPath)
+// The certificates are added as a resource for this package, should you prefer to use your own, you need to specify the appropriate path
+//let certPath:std.string = std.string(Bundle.module.path(forResource: "cacert", ofType: ".pem"))
+
+//try! Connection.setCertsPath(certPath)
 	
 let userId :std.string = "YourUserIDGoesHere" //The user's ID, assigned by You
 let userPK :std.string = "PrivateKeyOfTheUserInWIFFormatGoesHere" //The user's Private Key
@@ -31,13 +31,18 @@ let solutionID: std.string = "TheIdOfYourSolutionGoesHere" // The Id of your Sol
 let bridgeURL: std.string = "Address.Of.The.Bridge/GoesHere" // The address of the Platform
 
 // The static method Connection.connect(userPrivKey:solutionId:bridgeUrl:) returns a connection object, that is required to initialise other modules
-guard var connection = try? Connection.connect(userPrivKey: userPK, solutionId: solutionID, bridgeUrl: bridgeURL) as? Connection
+guard var connection = try? Connection.connect(userPrivKey: userPK, solutionId: solutionID, bridgeUrl: bridgeURL)
 else {exit(1)}
 
+// InboxApi utilises both Stores and Threads, thus it requires both of them in it's constructor.
 
-// ThreadApi instance is initialised with a connection, passed as an inout argument
-// ThreadApi is used for creating threads as well as reading and creating messages within threads
-guard let threadApi = try? ThreadApi.create(connection: &connection) else {exit(1)}
+
+// ThreadApi an instances is initialised with a connection, passed as an inout argument
+guard var threadApi = try? ThreadApi.create(connection: &connection) else {exit(1)}
+guard var storeApi = try? StoreApi.create(connection: &connection) else {exit(1)}
+guard let inboxApi = try? InboxApi.create(connection: &connection,
+										  threadApi:&threadApi,
+										  storeApi:&storeApi) else {exit(1)}
 
 // CryptoApi allows for cryptographic operations
 let cryptoApi = CryptoApi.create()
@@ -55,50 +60,94 @@ var usersWithPublicKeys = privmx.UserWithPubKeyVector()
 usersWithPublicKeys.push_back(UserWithPubKey(userId: userId,
 											 pubKey: try! cryptoApi.derivePublicKey(privKey: userPK)))
 
-// next, we use the list of users to create a thread named "My Example Thread" in our current context,
+// next, we use the list of users to create an Inbox named "My Example Thread" in our current context,
 // with the current user as the only member and manager
+// Note that
 // the method also returns the threadId of newly created thread
-guard let privateMeta = "My Example Thread".data(using: .utf8) else {exit(1)}
+let privateMeta = Data("My Example Inbox".utf8)
 let publicMeta = Data()
 
-guard let newThreadId = try? threadApi.createThread(
+guard let newInboxId = try? inboxApi.createInbox(
 	contextId: contextID,
 	users: usersWithPublicKeys,
 	managers: usersWithPublicKeys,
 	publicMeta: publicMeta.asBuffer(),
-	privateMeta: privateMeta.asBuffer())  else {exit(1)}
+	privateMeta: privateMeta.asBuffer(),
+	filesConfig: privmx.endpoint.inbox.FilesConfig(minCount: 1,
+												   maxCount: 1,
+												   maxFileSize: 1024,
+												   maxWholeUploadSize: 1024))  else {exit(1)}
 
 
-let messageToSend = "Hello World @ \(Date.now) !"
-guard let messageAsBuffer = messageToSend.data(using: .utf8)?.asBuffer() else {exit(1)}
+// Next we will create an entry in the newly created inbox.
+// To do that, we will need a file to send, as well as a message.
+let fileToSend = Data(String(repeating: "#", count: 1024).utf8)
+let messageToSend = Data("This is an entry sent @ \(Date.now)".utf8)
 
-// this creates a new message in the specified thread, in this case the newly created one
-// the returned string is the messageId of th enewly created message
-let newMessageId = try! threadApi.sendMessage(threadId: newThreadId, // thread in whech the message is sent
-											 publicMeta: privmx.endpoint.core.Buffer(), // metadata that wont be encrypted, we don't need it for now
-											 privateMeta: privmx.endpoint.core.Buffer(), // metadata that will be encryopted, we don't need it for now
-											 data: messageAsBuffer)
+// First thing we need to do is get a vector of file handles for the Inbox
+var fileHandleVector = privmx.InboxFileHandleVector()
+guard let fileHandle = try? inboxApi.createFileHandle(publicMeta: privmx.endpoint.core.Buffer(),
+													  privateMeta: privmx.endpoint.core.Buffer(),
+													  fileSize: Int64(fileToSend.count)) else {exit(1)}
+// Next we can create an entry handle
+guard let entryHandle = try? inboxApi.prepareEntry(inboxId: newInboxId,
+												   data: messageToSend.asBuffer(),
+												   inboxFileHandles: fileHandleVector,
+												   userPrivKey: userPK) else {exit(1)}
 
-print("New message id: ", String(newMessageId)) // the id of newly created message
 
-//now we retrieve the list of messages, which includes the newly sent message.
-// this returns a threadMessagesList structure, that contains a vector of threadMessages, as well as the total number of messages in thread
-guard let messagesList = try? threadApi.listMessages(threadId: newThreadId,
-													 query: PagingQuery(skip: 0,
+var buffer = fileToSend
+// with an entry handle we can start sending a file
+while !buffer.isEmpty {
+	// For the sake of the example we will send the file in 256 byte chunks, normally the chunks are much bigger
+	let chunk = Data(buffer.prefix(256))
+	
+	try inboxApi.writeToFile(inboxHandle: entryHandle, inboxFileHandle: fileHandle, dataChunk: chunk.asBuffer())
+	buffer = buffer.advanced(by: min(256,buffer.count))
+}
+
+// after sending all of the files the whole entry can be sent.
+try inboxApi.sendEntry(inboxHandle: entryHandle)
+
+//now we retrieve the list of entries, which includes the newly sent one.
+// this returns an IboxEntryList structure, that contains a C++ vector of Entrires
+guard let entryList = try? inboxApi.listEntries(inboxId: newInboxId,
+													 pagingQuery: PagingQuery(skip: 0,
 																	  limit: 10,
 																	  sortOrder: "desc",
 																	  lastId: nil
 																	 )) else {exit(1)}
 
 
-// at last, we print out the messages we retrieved, including the newly sent one
-for message in messagesList.readItems{
-	print(message.info.messageId, message.data)
+// at last, we print out the entries we retrieved, including the newly sent one.
+for entry in entryList.readItems{
+	print(entry.entryId, entry.data)
 }
-	
-	
-	
-	// This is the helper extension for converting Data to privmx.endpoint.core.Buffer
+
+// at this point there should be only one entry, with a single file
+// let's download that file to a buffer
+
+guard let file = entryList.readItems.first?.files.first else {exit(1)}
+
+var downloadedData: Data = Data()
+
+
+
+
+let fileHandle = try inboxApi.openFile(fileId: file.info.fileId)
+
+var chunk = Data()
+
+repeat{
+	chunk = try Data(from: inboxApi.readFromFile(fileHandle: fileHandle, length: 512))
+	downloadedData.append(chunk)
+}while chunk.count == 512
+
+try inboxApi.closeFile(fileHandle: fileHandle)
+
+print(downloadedData)
+
+// This is the helper extension for converting Data to privmx.endpoint.core.Buffer and back
 extension Data {
 	/// Helper, that returns contents of this instance as `privmx.endpoint.core.Buffer`
 	/// - Returns: Buffer
@@ -107,5 +156,16 @@ extension Data {
 		let dataSize = self.count
 		let resultCppString = privmx.endpoint.core.Buffer.from(pointer, dataSize)
 		return resultCppString
+	}
+	
+	public init(from buffer: privmx.endpoint.core.Buffer) throws {
+		guard let cDataPtr = buffer.__dataUnsafe() else {
+			var err = privmx.InternalError()
+			err.name = "Data Error"
+			err.message = "Data was nil"
+			throw PrivMXEndpointError.otherFailure(err)
+		}
+		let dataSize = buffer.size()
+		self.init(bytes: cDataPtr, count: dataSize)
 	}
 }
