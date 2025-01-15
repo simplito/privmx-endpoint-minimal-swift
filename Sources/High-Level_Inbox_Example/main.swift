@@ -77,10 +77,7 @@ guard
 		managedBy: usersWithPublicKeys,
 		withPublicMeta: publicMeta,
 		withPrivateMeta: privateMeta,
-		withFilesConfig: privmx.endpoint.inbox.FilesConfig(minCount: 1,
-														   maxCount: 1,
-														   maxFileSize: 64,
-														   maxWholeUploadSize: 128),
+		withFilesConfig: nil,
 		withPolicies: nil)
 else { exit(4) }
 
@@ -104,7 +101,7 @@ for e in entries.readItems {
 }
 
 // An entry can contain no files, but for the sake of this example we'll send one from a buffer
-let fileToSend = Data("test buffer data".utf8)
+let fileToSend = Data(String(repeating: "#", count: 1024).utf8)
 let messageToSend = Data("This is an entry sent @ \(Date.now)".utf8)
 
 // Alternatively we could use a `FileHandleDataSource` instance that uses a file from the disk insetad
@@ -129,7 +126,16 @@ else { exit(6) }
 // Now we start the process of sending the files
 // in a real-world scenarion this would happen on a separate thread,
 // but since the data to be sent is miniscule here, we can afford to do this synchronously.
-guard .sent == ((try? entryHandler.sendFiles()) ?? .error)
+
+var ehState : InboxEntryHandlerState
+do{
+	ehState = try entryHandler.sendFiles()
+} catch let err as PrivMXEndpointError{
+	ehState = .error
+	print("| ERROR:",err.getCode(),err.getMessage(),err.getName(),separator: "\n|")
+}
+
+guard .filesSent == ehState
 else { exit(7) }
 
 // Once all files are uploaded, the whole Entry can be sent.
@@ -148,8 +154,8 @@ else { exit(9) }
 
 print("--------")  //separator
 
-for e in entries2.readItems {
-	print(e, e.entryId, e.data)
+for en in entries2.readItems {
+	print(en.entryId, (try? String(decoding:Data(from:en.data), as: UTF8.self)))
 }
 
 // Now let us download one of the files associated with an entry.
@@ -158,17 +164,17 @@ let eid :privmx.endpoint.inbox.InboxEntry? = entries2.readItems.first
 let fileID = eid?.files.first?.id
 
 
-var downloadedData:Data = Data()
+nonisolated(unsafe) var downloadedData:Data = Data()
+nonisolated(unsafe) var threadDone = false//hacky solution to using async function in main
 
 // There are 2 ways to download provided by the high-level wrapper: using an async PrivMXEndpoint method, or by creating the handler directly
 // For the sake of this example, we'll be using the async method and waiting for it to execute
-var semaphore = DispatchSemaphore(value: 0)
-Task{
-	downloadedData = (try? await endpoint.startDownloadingToBufferFromInbox(from: fileID!)) ?? Data("Errors Occured".utf8)
-	semaphore.signal()
+Task.detached(){
+	downloadedData = (try await endpoint.startDownloadingToBufferFromInbox(from: fileID!))
+	threadDone = true
 }
-semaphore.wait()
+while !threadDone{} //hacky solution to using async function in main
 
 // And finally we print the downloaded data
 print(downloadedData)
-print(String(downloadedData.rawCppString()))
+print(downloadedData.asBuffer().getString())

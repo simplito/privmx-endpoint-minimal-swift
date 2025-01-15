@@ -37,7 +37,7 @@ let bridgeURL = "Address.Of.The.Bridge/GoesHere"  // The address of the Platform
 // as well as handle the event loop. For this example instancing this class directly will suffice.
 guard
 	var endpoint = try? PrivMXEndpoint.init(
-		modules: [.inbox],
+		modules: [.store],
 		userPrivKey: userPK,
 		solutionId: solutionID,
 		bridgeUrl: bridgeURL)
@@ -68,30 +68,22 @@ else { exit(2) }
 
 let publicMeta = Data()
 
-guard var inboxApi = endpoint.inboxApi else { exit(3) }
+guard var storeApi = endpoint.storeApi else { exit(3) }
 
 guard
-	let inboxId = try? inboxApi.createInbox(
+	let storeId = try? storeApi.createStore(
 		in: contextID,
 		for: usersWithPublicKeys,
 		managedBy: usersWithPublicKeys,
 		withPublicMeta: publicMeta,
 		withPrivateMeta: privateMeta,
-		withFilesConfig: privmx.endpoint.inbox.FilesConfig(
-			minCount: 1,
-			maxCount: 1,
-			maxFileSize: 64,
-			maxWholeUploadSize: 128),
 		withPolicies: nil)
 else { exit(4) }
 
-// To create an entry we need to prepare the files to be sent in that entry
-var files = [any FileDataSource]()
-
-// Now we list already present entries, as a way of showcasing the difference
+// Now we list already present files, as a way of showcasing the difference
 guard
-	let entries = try? inboxApi.listEntries(
-		from: inboxId,
+	let entries = try? storeApi.listFiles(
+		from: storeId,
 		basedOn: PagingQuery(
 			skip: 0,
 			limit: 10,
@@ -101,46 +93,37 @@ else { exit(5) }
 print("--------")  //separator
 
 for e in entries.readItems {
-	print(e, e.entryId, e.data)
+	print(e.id, e.size)
 }
 
 // An entry can contain no files, but for the sake of this example we'll send one from a buffer
-let fileToSend = Data("test buffer data".utf8)
-
-// Alternatively we could use a `FileHandleDataSource` instance that uses a file from the disk
-// insetad
-files.append(
-	BufferDataSource(
-		buffer: fileToSend,
-		privateMeta: Data(),
-		publicMeta: Data(),
-		size: Int64(fileToSend.count)))
+let fileToSend = Data(String(repeating: "#", count: 1024).utf8)
 
 // Next we create the handler for creating and sending the entry
 // This also can be done anonymously by passing `nil` instead of the user key.
+nonisolated(unsafe) var fileId :String = ""
+nonisolated(unsafe) var err = false
+nonisolated(unsafe) var threadDone = false //hacky solution to using async function in main
+
+var semaphore1 = DispatchSemaphore(value: 0)
+Task.detached(){
+	if let fid = try? await endpoint.startUploadingNewFileFromBuffer(fileToSend,
+																		to: storeId,
+																		withPublicMeta: Data(),
+																		withPrivateMeta: Data(),
+																		sized: Int64(fileToSend.count),
+																	 withChunksOf: 256){
+		
+			fileId = fid
+	} else {
+		err = true
+	}
+	threadDone = true//hacky solution to using async function in main
+}
+while(!threadDone){} //hacky solution to using async function in main
 guard
-	var entryHandler = try? InboxEntryHandler.prepareInboxEntryHandler(
-		using: inboxApi,  // instance of PrivMXInbox
-		in: inboxId,  // id of the Inbox to which the Entry will be sent
-		containing: Data("This is an entry".utf8),  // Data sent in the entry
-		sending: files,  // List of files to send
-		as: userPK)  // as who will the inbox entry be created
-else { exit(6) }
-
-// Now we start the process of sending the files
-// in a real-world scenarion this would happen on a separate thread,
-// but since the data to be sent is miniscule here, we can afford to do this synchronously.
-guard .sent == ((try? entryHandler.sendFiles()) ?? .error)
-else { exit(7) }
-
-// Once all files are uploaded, the whole Entry can be sent.
-do {
-	try entryHandler.sendEntry()
-} catch { exit(8) }
-
-guard
-	let entries2 = try? inboxApi.listEntries(
-		from: inboxId,
+	let files2 = try? storeApi.listFiles(
+		from: storeId,
 		basedOn: PagingQuery(
 			skip: 0,
 			limit: 10,
@@ -149,26 +132,20 @@ else { exit(9) }
 
 print("--------")  //separator
 
-for e in entries2.readItems {
-	print(e, e.entryId, e.data)
+for e in files2.readItems {
+	print(e, e.id)
 }
 
-// Now let us download one of the files associated with an entry.
-// For that we will need an ID of the file to download
-let eid :privmx.endpoint.inbox.InboxEntry? = entries2.readItems.first
-let fileID = eid?.files.first?.id
-
-
-var downloadedData:Data = Data()
-
+nonisolated(unsafe) var downloadedData:Data = Data()
+//var semaphore2 = DispatchSemaphore(value: 0)
 // There are 2 ways to download provided by the high-level wrapper: using an async PrivMXEndpoint method, or by creating the handler directly
 // For the sake of this example, we'll be using the async method and waiting for it to execute
-var semaphore = DispatchSemaphore(value: 0)
-Task{
-	downloadedData = (try? await endpoint.startDownloadingToBuffer(from: fileID!)) ?? Data("Errors Occured".utf8)
-	semaphore.signal()
+threadDone = false
+Task.detached(){
+	downloadedData = (try? await endpoint.startDownloadingToBuffer(from: fileId)) ?? Data("Errors Occured".utf8)
+	threadDone = true
 }
-semaphore.wait()
+while !threadDone{}//hacky solution to using async function in main
 
 // And finally we print the downloaded data
 print(downloadedData)

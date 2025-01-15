@@ -25,10 +25,10 @@ typealias PagingQuery = privmx.endpoint.core.PagingQuery //for brevity
 
 //try! Connection.setCertsPath(certPath)
 	
-let userId :std.string = "YourUserIDGoesHere" //The user's ID, assigned by You
-let userPK :std.string = "PrivateKeyOfTheUserInWIFFormatGoesHere" //The user's Private Key
-let solutionID: std.string = "TheIdOfYourSolutionGoesHere" // The Id of your Solution
-let bridgeURL: std.string = "Address.Of.The.Bridge/GoesHere" // The address of the Platform
+let userId :std.string = "testUsr" //The user's ID, assigned by You
+let userPK :std.string = "L1nZyDmrcQKumKd1jx17SfgpMKECNuuikFFHSNy4iV9PjPdPwak6" //The user's Private Key
+let solutionID: std.string = "d2de6b79-c4ef-47be-a54b-abe5257438e5" // The Id of your Solution
+let bridgeURL: std.string = "http://localhost:9111" // The address of the Platform
 
 // The static method Connection.connect(userPrivKey:solutionId:bridgeUrl:) returns a connection object, that is required to initialise other modules
 guard var connection = try? Connection.connect(userPrivKey: userPK, solutionId: solutionID, bridgeUrl: bridgeURL)
@@ -49,7 +49,7 @@ let cryptoApi = CryptoApi.create()
 
 // In this example we assume that you have already created a context
 // and added a user (whose private key you used for connection) to it
-let contextID: std.string = "TheIdOfYourContextGoesHere" // The Id of your Context
+let contextID: std.string = "7e7d903c-5abf-4b88-9c94-afb5482414b6" // The Id of your Context
 
 var usersWithPublicKeys = privmx.UserWithPubKeyVector()
 
@@ -73,10 +73,7 @@ guard let newInboxId = try? inboxApi.createInbox(
 	managers: usersWithPublicKeys,
 	publicMeta: publicMeta.asBuffer(),
 	privateMeta: privateMeta.asBuffer(),
-	filesConfig: privmx.endpoint.inbox.FilesConfig(minCount: 1,
-												   maxCount: 1,
-												   maxFileSize: 1024,
-												   maxWholeUploadSize: 1024))  else {exit(1)}
+	filesConfig: nil)  else {exit(1)}
 
 
 // Next we will create an entry in the newly created inbox.
@@ -89,6 +86,7 @@ var fileHandleVector = privmx.InboxFileHandleVector()
 guard let fileHandle = try? inboxApi.createFileHandle(publicMeta: privmx.endpoint.core.Buffer(),
 													  privateMeta: privmx.endpoint.core.Buffer(),
 													  fileSize: Int64(fileToSend.count)) else {exit(1)}
+fileHandleVector.push_back(fileHandle)
 // Next we can create an entry handle
 guard let entryHandle = try? inboxApi.prepareEntry(inboxId: newInboxId,
 												   data: messageToSend.asBuffer(),
@@ -97,17 +95,25 @@ guard let entryHandle = try? inboxApi.prepareEntry(inboxId: newInboxId,
 
 
 var buffer = fileToSend
-// with an entry handle we can start sending a file
-while !buffer.isEmpty {
-	// For the sake of the example we will send the file in 256 byte chunks, normally the chunks are much bigger
-	let chunk = Data(buffer.prefix(256))
-	
-	try inboxApi.writeToFile(inboxHandle: entryHandle, inboxFileHandle: fileHandle, dataChunk: chunk.asBuffer())
-	buffer = buffer.advanced(by: min(256,buffer.count))
+do{
+	// with an entry handle we can start sending a file
+	while !buffer.isEmpty {
+		// For the sake of the example we will send the file in 256 byte chunks, normally the chunks are much bigger
+		let chunk = Data(buffer.prefix(256))
+		
+		try inboxApi.writeToFile(inboxHandle: entryHandle, inboxFileHandle: fileHandle, dataChunk: chunk.asBuffer())
+		buffer = buffer.advanced(by: min(256,buffer.count))
+	}
+}catch let err as PrivMXEndpointError{
+	print(err.getCode() ?? 0, err.getMessage(),err.getName(),separator: "\n")
 }
 
-// after sending all of the files the whole entry can be sent.
-try inboxApi.sendEntry(inboxHandle: entryHandle)
+do{
+	// after sending all of the files the whole entry can be sent.
+	try inboxApi.sendEntry(inboxHandle: entryHandle)
+}catch let err as PrivMXEndpointError{
+	print(err.getCode(),err.getMessage(),err.getName())
+}
 
 //now we retrieve the list of entries, which includes the newly sent one.
 // this returns an IboxEntryList structure, that contains a C++ vector of Entrires
@@ -134,16 +140,16 @@ var downloadedData: Data = Data()
 
 
 
-let fileHandle = try inboxApi.openFile(fileId: file.info.fileId)
+let fileHandleForReading = try inboxApi.openFile(fileId: file.info.fileId)
 
 var chunk = Data()
 
 repeat{
-	chunk = try Data(from: inboxApi.readFromFile(fileHandle: fileHandle, length: 512))
+	chunk = try Data(from: inboxApi.readFromFile(fileHandle: fileHandleForReading, length: 512))
 	downloadedData.append(chunk)
 }while chunk.count == 512
 
-_ = try inboxApi.closeFile(fileHandle: fileHandle)
+_ = try inboxApi.closeFile(fileHandle: fileHandleForReading)
 
 print(downloadedData)
 

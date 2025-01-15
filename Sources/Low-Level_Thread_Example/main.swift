@@ -89,21 +89,38 @@ guard let messagesList = try? threadApi.listMessages(threadId: newThreadId,
 																	  lastId: nil
 																	 )) else {exit(1)}
 
+
+// at last, we print out the messages we retrieved, including the newly sent one
+for message in messagesList.readItems{
+	print(message.info.messageId, message.data.getString() ?? "")
+}
+
+print("---- update -----")
+
 let updatedMessage = "Old message was \"\(messageToSend)\", now it's this @ \(Date.now) !"
-guard let messageAsBuffer = messageToSend.data(using: .utf8)?.asBuffer() else {exit(1)}
+guard let updatedMessageAsBuffer = updatedMessage.data(using: .utf8)?.asBuffer() else {exit(1)}
 
 try! threadApi.updateMessage(messageId: newMessageId,
 							 publicMeta: privmx.endpoint.core.Buffer(),
 							 privateMeta: privmx.endpoint.core.Buffer(),
-							 data: messageAsBuffer)
-// at last, we print out the messages we retrieved, including the newly sent one
-for message in messagesList.readItems{
-	print(message.info.messageId, message.data)
+							 data: updatedMessageAsBuffer)
+	
+	
+//now we retrieve the new list of messages, which includes the newly updated message.
+guard let messagesList2 = try? threadApi.listMessages(threadId: newThreadId,
+													 pagingQuery: PagingQuery(skip: 0,
+																	  limit: 10,
+																	  sortOrder: "desc",
+																	  lastId: nil
+																	 )) else {exit(1)}
+
+
+// and print out the messages we retrieved
+for m in messagesList2.readItems{
+	print(m.info.messageId, m.data.getString() ?? "")
 }
-	
-	
-	
-	// This is the helper extension for converting Data to privmx.endpoint.core.Buffer
+
+// This is the helper extension for converting Data to privmx.endpoint.core.Buffer
 extension Data {
 	/// Helper, that returns contents of this instance as `privmx.endpoint.core.Buffer`
 	/// - Returns: Buffer
@@ -112,5 +129,19 @@ extension Data {
 		let dataSize = self.count
 		let resultCppString = privmx.endpoint.core.Buffer.from(pointer, dataSize)
 		return resultCppString
+	}
+}
+
+extension privmx.endpoint.core.Buffer{
+	/// Creates a new `String` instance from the buffer's underlying bytes.
+	///
+	/// This helper function converts the buffer into a UTF-8 `String`.
+	/// - Returns: A new `String` instance if the conversion is successful, otherwise `nil`.
+	public func getString() -> String? {
+		var data = Data()
+		if let bufstr = self.__dataUnsafe() {
+			data = Data(bytes: bufstr, count: self.size())
+		}
+		return String(data: data, encoding: .utf8)
 	}
 }

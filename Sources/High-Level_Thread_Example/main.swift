@@ -72,7 +72,7 @@ let publicMeta = Data()
 guard var threadApi = endpoint.threadApi else { exit(3) }
 
 guard
-	let inboxId = try? threadApi.createThread(
+	let threadId = try? threadApi.createThread(
 		in: contextID,
 		for: usersWithPublicKeys,
 		managedBy: usersWithPublicKeys,
@@ -84,7 +84,7 @@ else { exit(4) }
 // Now we list already present messages, as a way of showcasing the difference later on
 guard
 	let messages = try? threadApi.listMessages(
-		from: inboxId,
+		from: threadId,
 		basedOn: PagingQuery(
 			skip: 0,
 			limit: 10,
@@ -103,7 +103,7 @@ let messageToSend = Data("test message data, sent @ \(Date.now)".utf8)
 
 
 guard
-	var messageId = try? threadApi.sendMessage(in: inboxId,
+	var messageId = try? threadApi.sendMessage(in: threadId,
 											   withPublicMeta: Data(),
 											   withPrivateMeta: Data(),
 											   containing: messageToSend)
@@ -112,7 +112,7 @@ else { exit(6) }
 
 guard
 	let messages2 = try? threadApi.listMessages(
-		from: inboxId,
+		from: threadId,
 		basedOn: PagingQuery(
 			skip: 0,
 			limit: 10,
@@ -121,7 +121,31 @@ else { exit(7) }
 
 print("--------")  //separator
 
-for m in messages2.readItems {
-	print(m, m.id, m.data)
+for m2 in messages2.readItems {
+	print(m2, m2.id, m2.data.getString() ?? "[Message was NIL]")
 }
 
+print("---- update -----")
+
+let updatedMessage = "Old message was \"\(String(decoding:messageToSend,as:UTF8.self))\", now it's this @ \(Date.now) !"
+guard let updatedMessageAsBuffer = updatedMessage.data(using: .utf8) else {exit(1)}
+
+try! threadApi.updateMessage(messageId,
+							 replacingData: updatedMessageAsBuffer,
+							 replacingPublicMeta: Data(),
+							 replacingPrivateMeta: Data())
+	
+	
+//now we retrieve the new list of messages, which includes the newly updated message.
+guard let messagesList2 = try? threadApi.listMessages(from: threadId,
+													  basedOn: PagingQuery(skip: 0,
+																	  limit: 10,
+																	  sortOrder: "desc",
+																	  lastId: nil
+																	 )) else {exit(1)}
+
+
+// and print out the messages we retrieved
+for m in messagesList2.readItems{
+	print(m.info.messageId, m.data.getString() ?? "")
+}

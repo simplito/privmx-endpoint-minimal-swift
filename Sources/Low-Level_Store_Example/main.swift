@@ -24,10 +24,10 @@ typealias PagingQuery = privmx.endpoint.core.PagingQuery //for brevity
 
 //try! Connection.setCertsPath(certPath)
 
-let userId :std.string = "YourUserIDGoesHere" //The user's ID, assigned by You
-let userPK :std.string = "PrivateKeyOfTheUserInWIFFormatGoesHere" //The user's Private Key
-let solutionID: std.string = "TheIdOfYourSolutionGoesHere" // The Id of your Solution
-let bridgeURL: std.string = "Address.Of.The.Bridge/GoesHere" // The address of the Platform
+let userId :std.string = "testUsr" //The user's ID, assigned by You
+let userPK :std.string = "L1nZyDmrcQKumKd1jx17SfgpMKECNuuikFFHSNy4iV9PjPdPwak6" //The user's Private Key
+let solutionID: std.string = "d2de6b79-c4ef-47be-a54b-abe5257438e5" // The Id of your Solution
+let bridgeURL: std.string = "http://localhost:9111" // The address of the Platform
 
 // The static method Connection.connect(userPrivKey:solutionId:bridgeUrl:) returns a connection object, that is required to initialise other modules
 guard var connection = try? Connection.connect(userPrivKey: userPK, solutionId: solutionID, bridgeUrl: bridgeURL)
@@ -43,7 +43,7 @@ let cryptoApi = CryptoApi.create()
 
 // In this example we assume that you have already created a context
 // and added a user (whose private key you used for connection) to it
-let contextID: std.string = "TheIdOfYourContextGoesHere" // The Id of your Context
+let contextID: std.string = "7e7d903c-5abf-4b88-9c94-afb5482414b6" // The Id of your Context
 
 var usersWithPublicKeys = privmx.UserWithPubKeyVector()
 
@@ -57,7 +57,7 @@ usersWithPublicKeys.push_back(UserWithPubKey(userId: userId,
 // next, we use the list of users to create a thread named "My Example Thread" in our current context,
 // with the current user as the only member and manager
 // the method also returns the threadId of newly created thread
-guard let privateMeta = "My Example Thread".data(using: .utf8) else {exit(1)}
+guard let privateMeta = "My Example Thread".data(using: .utf8) else {exit(2)}
 let publicMeta = Data()
 
 guard let newStoreId = try? storeApi.createStore(
@@ -65,7 +65,7 @@ guard let newStoreId = try? storeApi.createStore(
 	users: usersWithPublicKeys,
 	managers: usersWithPublicKeys,
 	publicMeta: publicMeta.asBuffer(),
-	privateMeta: privateMeta.asBuffer())  else {exit(1)}
+	privateMeta: privateMeta.asBuffer())  else {exit(3)}
 
 
 let fileToSend = Data(String(repeating: "#", count: 1024).utf8)
@@ -93,10 +93,10 @@ guard let filesList = try? storeApi.listFiles(storeId: newStoreId,
 																	  limit: 10,
 																	  sortOrder: "desc",
 																	  lastId: nil
-																	 )) else {exit(1)}
+																	 )) else {exit(4)}
 
 
-guard let fileId = filesList.readItems.first?.info.fileId else {exit(1)}
+guard let fileId = filesList.readItems.first?.info.fileId else {exit(5)}
 var downloadedData: Data = Data()
 
 

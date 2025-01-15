@@ -5,8 +5,9 @@ import PackageDescription
 
 let package = Package(
     name: "privmx-endpoint-minimal-swift",
-	platforms: [.macOS(.v14)],
-	
+	platforms: [
+		.macOS(.v14)
+	],
     dependencies: [
 		.package(
 			url: "https://github.com/simplito/privmx-endpoint-swift-extra",
