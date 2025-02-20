@@ -25,19 +25,17 @@ print("High-Level Inbox Example")
 
 // You can set the certs either by calling
 //.setCertsPath(_:) on an instance of PrivMXEndpointContainer
-// or by calling the method below
-//try Connection.setCertsPath(certPath)
+// or by calling `try Connection.setCertsPath(certPath)`
 
 // In this example we assume that you have already created a context
 // and added a user (whose private key you used for connection) to it
-let userId = "YourUserIDGoesHere"  //The user's ID, assigned by You
-let userPK = "PrivateKeyOfTheUserInWIFFormatGoesHere"  //The user's Private Key, stored for demonstration purposes
+let userId = "YourUserIDGoesHere"
+let userPK = "PrivateKeyOfTheUserInWIFFormatGoesHere"
 let solutionID = "TheIdOfYourSolutionGoesHere"  // The Id of your Solution
 let bridgeURL = "Address.Of.The.Bridge:GoesHere"  // The address of the Platform Bridge,
 let contextId = "TheIdOfYourContextGoesHere"
-// Optionally you can call endpoint.connection.listContexts()
+// Optionally to get a contextId you can call endpoint.connection.listContexts(basedOn:)
 // that will return a list of contexts to which the current user has been added
-
 
 // We create an PrivMXEndpoint instance,
 // in real-world scenrio you'd be using a PrivMXEndpointContainer to manage PrivMXEndpoints as well as handle the event loop.

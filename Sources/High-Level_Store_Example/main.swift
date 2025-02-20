@@ -28,59 +28,59 @@ print("High-Level Store Example")
 // or by calling the method below
 //try Connection.setCertsPath(certPath)
 
+// In this example we assume that you have already created a context
+// and added a user (whose private key you used for connection) to it
 let userId = "YourUserIDGoesHere"  //The user's ID, assigned by You
 let userPK = "PrivateKeyOfTheUserInWIFFormatGoesHere"  //The user's Private Key
 let solutionID = "TheIdOfYourSolutionGoesHere"  // The Id of your Solution
-let bridgeURL = "Address.Of.The.Bridge/GoesHere"  // The address of the Platform Bridge,
+let bridgeURL = "Address.Of.The.Bridge:GoesHere"  // The address of the Platform Bridge,
+let contextId = "TheIdOfYourContextGoesHere"
+// Optionally you can call endpoint.connection.listContexts()
+// that will return a list of contexts to which the current user has been added
 
-// We create an PrivMXEndpoint instance, in real-world scenrio you'd be using a PrivMXEndpointContainer to manage PrivMXEndpoints
-// as well as handle the event loop. For this example instancing this class directly will suffice.
-guard
-	var endpoint = try? PrivMXEndpoint.init(
+// We create an PrivMXEndpoint instance,
+// in real-world scenrio you'd be using a PrivMXEndpointContainer to manage PrivMXEndpoints as well as handle the event loop.
+// For this example instancing this class directly will suffice.
+guard var endpoint = try? PrivMXEndpoint.init(
 		modules: [.store],
 		userPrivKey: userPK,
 		solutionId: solutionID,
 		bridgeUrl: bridgeURL)
 else { exit(1) }
 
-// In this example we assume that you have already created a context
-// and added a user (whose private key you used for connection) to it
-// alternatively you can call endpoint.connection.listContexts()
-// which will return a list of contexts to which the current user has been added
-let contextID = "TheIdOfYourContextGoesHere"
-
+// To create a new Store, a list of Users with their Public Keys is needed.
+// Thus we create one that will be used for both users and managers
+// (typically those lists won't be identical)
 var usersWithPublicKeys = [privmx.endpoint.core.UserWithPubKey]()
 
-// then we add the curernt user to the list (in real world it should be a list of all participants)
-// together with their assigned username, which can be retrieved from the context using PrivMX Bridge REST API
-// the public key in this particular case can be derived from the private key,
+// We add the curernt user to the list (in real world it should be a list of all participants).
+// The public key in this particular case can be derived from the private key,
 // but in typical circumstance should be acquired from an outside source (like your authorisation server)
 usersWithPublicKeys.append(
 	UserWithPubKey(
 		userId: std.string(userId),
 		pubKey: try! CryptoApi.create().derivePublicKey(privKey: std.string(userPK))))
 
-// next, we use the list of users to create an inbox named "A new Inbox" in our current context,
-// with the current user as the only member and manager
-// the method also returns the inboxId of newly created Inbox
-guard let privateMeta = "My Example Inbox".data(using: .utf8)
+let publicMeta = Data()
+let privateMeta = Data("My Example Store".utf8)
+guard var storeApi = endpoint.storeApi
 else { exit(2) }
 
-let publicMeta = Data()
+// next, we use the list as both a list of users and a list of managers to create a Store
+// we pass "My Example Store" as its private metadata in our current context,
+// the method also returns the storeId of newly created Store
 
-guard var storeApi = endpoint.storeApi else { exit(3) }
+guard let storeId = try? storeApi.createStore(
+	in: contextId,
+	for: usersWithPublicKeys,
+	managedBy: usersWithPublicKeys,
+	withPublicMeta: publicMeta,
+	withPrivateMeta: privateMeta,
+	withPolicies: nil)
+else { exit(3) }
 
-guard
-	let storeId = try? storeApi.createStore(
-		in: contextID,
-		for: usersWithPublicKeys,
-		managedBy: usersWithPublicKeys,
-		withPublicMeta: publicMeta,
-		withPrivateMeta: privateMeta,
-		withPolicies: nil)
-else { exit(4) }
-
-// Now we list already present files, as a way of showcasing the difference
+// Now we list already present files, as a way of showcasing the difference,
+// As this is a newly createadStore, there obviously be no files yet
 guard
 	let entries = try? storeApi.listFiles(
 		from: storeId,
@@ -90,54 +90,55 @@ guard
 			sortOrder: .desc))
 else { exit(5) }
 
-print("--------")  //separator
-
 for e in entries.readItems {
 	print(e.id, e.size)
 }
 
-// An entry can contain no files, but for the sake of this example we'll send one from a buffer
+print("--------")  //separator for better output readability
+
 let fileToSend = Data(String(repeating: "#", count: 1024).utf8)
 
-// Next we create the handler for creating and sending the entry
-// This also can be done anonymously by passing `nil` instead of the user key.
+// The high-level wrapper offers two ways to send and download files:
+// using the PrivMXStoreFileHandler class or using the async methods provided by the PrivMXEndpoint
+// in this example we will be using the latter
 nonisolated(unsafe) var fileId :String = ""
 nonisolated(unsafe) var err = false
 nonisolated(unsafe) var threadDone = false //hacky solution to using async function in main
 
-var semaphore1 = DispatchSemaphore(value: 0)
 Task.detached(){
-	if let fid = try? await endpoint.startUploadingNewFileFromBuffer(fileToSend,
-																		to: storeId,
-																		withPublicMeta: Data(),
-																		withPrivateMeta: Data(),
-																		sized: Int64(fileToSend.count),
-																	 withChunksOf: 256){
-		
-			fileId = fid
+	if let fid = try? await endpoint.startUploadingNewFileFromBuffer(
+		fileToSend,
+		to: storeId,
+		withPublicMeta: Data(),
+		withPrivateMeta: Data(),
+		sized: Int64(fileToSend.count),
+		withChunksOf: 256
+	){
+		fileId = fid
 	} else {
 		err = true
 	}
 	threadDone = true//hacky solution to using async function in main
 }
 while(!threadDone){} //hacky solution to using async function in main
-guard
-	let files2 = try? storeApi.listFiles(
-		from: storeId,
-		basedOn: PagingQuery(
-			skip: 0,
-			limit: 10,
-			sortOrder: .desc))
-else { exit(9) }
 
-print("--------")  //separator
+// we again list the files in the store and print them
+guard let files2 = try? storeApi.listFiles(
+	from: storeId,
+	basedOn: PagingQuery(
+		skip: 0,
+		limit: 10,
+		sortOrder: .desc))
+else { exit(9) }
 
 for e in files2.readItems {
 	print(e, e.id)
 }
 
+print("--------")  //separator for better output readability
+
 nonisolated(unsafe) var downloadedData:Data = Data()
-//var semaphore2 = DispatchSemaphore(value: 0)
+
 // There are 2 ways to download provided by the high-level wrapper: using an async PrivMXEndpoint method, or by creating the handler directly
 // For the sake of this example, we'll be using the async method and waiting for it to execute
 threadDone = false
@@ -149,4 +150,4 @@ while !threadDone{}//hacky solution to using async function in main
 
 // And finally we print the downloaded data
 print(downloadedData)
-print(String(downloadedData.rawCppString()))
+print(downloadedData.asBuffer().getString() ?? "ERROR converting to string")

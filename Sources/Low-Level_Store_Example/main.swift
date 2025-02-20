@@ -19,31 +19,39 @@ import Foundation
 typealias UserWithPubKey = privmx.endpoint.core.UserWithPubKey //for brevity
 typealias PagingQuery = privmx.endpoint.core.PagingQuery //for brevity
 
-// The certificates are added as a resource for this package, should you prefer to use your own, you need to specify the appropriate path
-//let certPath:std.string = std.string(Bundle.module.path(forResource: "cacert", ofType: ".pem"))
+print("Low-Level Store Example")
 
-//try! Connection.setCertsPath(certPath)
+// This example assumes that the bridge is hosted locally on your machine, which removes the necessity of setting ssl certificates
+// in a real-world scenario you will need to provide a certificate that will be used by OpenSSL for the connection
+//let certPath :std.string = "/Path/to/the/certificate.file"
 
-let userId :std.string = "testUsr" //The user's ID, assigned by You
-let userPK :std.string = "L1nZyDmrcQKumKd1jx17SfgpMKECNuuikFFHSNy4iV9PjPdPwak6" //The user's Private Key
-let solutionID: std.string = "d2de6b79-c4ef-47be-a54b-abe5257438e5" // The Id of your Solution
-let bridgeURL: std.string = "http://localhost:9111" // The address of the Platform
+// You can set the certs by calling
+// try Connection.setCertsPath(certPath)
+
+// In this example we assume that you have already created a context
+// and added a user (whose private key you used for connection) to it
+let userId :std.string = "YourUserIDGoesHere"  //The user's ID, assigned by You
+let userPK :std.string = "PrivateKeyOfTheUserInWIFFormatGoesHere"  //The user's Private Key
+let solutionID :std.string = "TheIdOfYourSolutionGoesHere"  // The Id of your Solution
+let bridgeURL :std.string = "Address.Of.The.Bridge:GoesHere"  // The address of the Platform Bridge,
+let contextId :std.string = "TheIdOfYourContextGoesHere"
+// Optionally you can call endpoint.connection.listContexts()
+// that will return a list of contexts to which the current user has been added
+
 
 // The static method Connection.connect(userPrivKey:solutionId:bridgeUrl:) returns a connection object, that is required to initialise other modules
 guard var connection = try? Connection.connect(userPrivKey: userPK, solutionId: solutionID, bridgeUrl: bridgeURL)
 else {exit(1)}
 
 
-// ThreadApi instance is initialised with a connection, passed as an inout argument
-// ThreadApi is used for creating threads as well as reading and creating messages within threads
+// StoreApi instance is initialised with a connection, passed as an inout argument
+// StoreApi is used for creating Stores as well as reading and creating Files within Stores
 guard let storeApi = try? StoreApi.create(connection: &connection) else {exit(1)}
 
 // CryptoApi allows for cryptographic operations
 let cryptoApi = CryptoApi.create()
 
-// In this example we assume that you have already created a context
-// and added a user (whose private key you used for connection) to it
-let contextID: std.string = "7e7d903c-5abf-4b88-9c94-afb5482414b6" // The Id of your Context
+
 
 var usersWithPublicKeys = privmx.UserWithPubKeyVector()
 
@@ -54,14 +62,14 @@ var usersWithPublicKeys = privmx.UserWithPubKeyVector()
 usersWithPublicKeys.push_back(UserWithPubKey(userId: userId,
 											 pubKey: try! cryptoApi.derivePublicKey(privKey: userPK)))
 
-// next, we use the list of users to create a thread named "My Example Thread" in our current context,
+// next, we use the list of users to create a thread named "My Example Store" in our current context,
 // with the current user as the only member and manager
 // the method also returns the threadId of newly created thread
-guard let privateMeta = "My Example Thread".data(using: .utf8) else {exit(2)}
+guard let privateMeta = "My Example Store".data(using: .utf8) else {exit(2)}
 let publicMeta = Data()
 
 guard let newStoreId = try? storeApi.createStore(
-	contextId: contextID,
+	contextId: contextId,
 	users: usersWithPublicKeys,
 	managers: usersWithPublicKeys,
 	publicMeta: publicMeta.asBuffer(),
@@ -86,17 +94,20 @@ while !buffer.isEmpty {
 
 let newFileID = try storeApi.closeFile(handle: writeFileHandle)
 
-//now we retrieve the list of messages, which includes the newly sent message.
-// this returns a FileList structure, that contains a vector of Files, as well as the total number of messages in thread
-guard let filesList = try? storeApi.listFiles(storeId: newStoreId,
-													 pagingQuery: PagingQuery(skip: 0,
-																	  limit: 10,
-																	  sortOrder: "desc",
-																	  lastId: nil
-																	 )) else {exit(4)}
+//now we retrieve the list of Files, which includes the newly sent file.
+// this returns a FileList structure, that contains a vector of Files, as well as the total number of Files in thread
+guard let filesList = try? storeApi.listFiles(
+	storeId: newStoreId,
+	pagingQuery: PagingQuery(skip: 0,
+							 limit: 10,
+							 sortOrder: "desc",
+							 lastId: nil
+							))
+else {exit(4)}
 
 
-guard let fileId = filesList.readItems.first?.info.fileId else {exit(5)}
+guard let fileId = filesList.readItems.first?.info.fileId
+else {exit(5)}
 var downloadedData: Data = Data()
 
 
@@ -112,6 +123,7 @@ repeat{
 _ = try storeApi.closeFile(handle: fileHandle)
 
 print(downloadedData)
+
 
 // This is the helper extension for converting Data to privmx.endpoint.core.Buffer and back
 extension Data {
