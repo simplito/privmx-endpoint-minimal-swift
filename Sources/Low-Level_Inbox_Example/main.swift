@@ -21,11 +21,11 @@ typealias PagingQuery = privmx.endpoint.core.PagingQuery //for brevity
 
 print("Low-Level Inbox Example")
 
-// This example assumes that the bridge is hosted locally on your machine, which removes the necessity of setting ssl certificates
-// in a real-world scenario you will need to provide a certificate that will be used by OpenSSL for the connection
+// This example assumes that the bridge is hosted locally, which removes the necessity of setting ssl certificates
+// in a real-world scenario a certificate that will be used by OpenSSL for the connection needs to be provided.
 //let certPath :std.string = "/Path/to/the/certificate.file"
 
-// You can set the certs by calling
+// You can set the certificate by calling
 // try Connection.setCertsPath(certPath)
 
 // In this example we assume that a context already exists
@@ -65,10 +65,9 @@ let cryptoApi = CryptoApi.create()
 // To create a new Inbox, a list of Users with their Public Keys is needed.
 // Thus we create one that will be used for both users and managers
 // (typically those lists won't be identical)
-
 var usersWithPublicKeys = privmx.UserWithPubKeyVector()
 
-// We add the curernt user to the list (in real world it should be a list of all participants).
+// We add the current user to the list (in real world it should be a list of all participants).
 // The public key in this particular case can be derived from the private key,
 // but in typical circumstance should be acquired from an outside source (like your authorisation server)
 usersWithPublicKeys.push_back(UserWithPubKey(userId: userId,
@@ -77,7 +76,7 @@ usersWithPublicKeys.push_back(UserWithPubKey(userId: userId,
 let privateMeta = Data("My Example Inbox".utf8)
 let publicMeta = Data()
 
-// Next, we use the list as both a list of users and a list of managers to create an inbox
+// Next, we use the list as both a list of users and a list of managers to create an Inbox,
 // passing "My Example Inbox" as its private metadata.
 // The method also returns the inboxId of newly created Inbox.
 // Passing a nill to filesConfing means the default one will be used.
@@ -173,6 +172,7 @@ else {exit(9)}
 
 
 // At last, we print out the entries we retrieved, including the newly sent one.
+// Note that this does not download the actual entries, but only their descriptions.
 for entry in entryList.readItems{
 	print(entry.entryId, entry.data)
 }
