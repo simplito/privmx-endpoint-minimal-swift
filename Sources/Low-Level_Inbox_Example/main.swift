@@ -28,17 +28,16 @@ print("Low-Level Inbox Example")
 // You can set the certs by calling
 // try Connection.setCertsPath(certPath)
 
-// In this example we assume that you have already created a context
-// and added a user (whose private key you used for connection) to it
-let userId :std.string = "YourUserIDGoesHere"  //The user's ID, assigned by You
-let userPK :std.string = "PrivateKeyOfTheUserInWIFFormatGoesHere"  //The user's Private Key
-let solutionID :std.string = "TheIdOfYourSolutionGoesHere"  // The Id of your Solution
-let bridgeURL :std.string = "Address.Of.The.Bridge:GoesHere"  // The address of the Platform Bridge,
+// In this example we assume that a context already exists
+// and a user (whose private key is used for connection) has been added to it.
+let userId :std.string = "YourUserIDGoesHere"
+let userPK :std.string = "PrivateKeyOfTheUserInWIFFormatGoesHere"
+let solutionID :std.string = "TheIdOfYourSolutionGoesHere"
+let bridgeURL :std.string = "Address.Of.The.Bridge:GoesHere"
 let contextId :std.string = "TheIdOfYourContextGoesHere"
-// Optionally to get a contextId you can call .listContexts(query:) on the connection instance
-// that will return a list of contexts to which the current user has been added
 
-// The static method Connection.connect(userPrivKey:solutionId:bridgeUrl:) returns a connection object, that is required to initialise other modules
+// The static method Connection.connect(userPrivKey:solutionId:bridgeUrl:) returns a connection object,
+// which is required by almost all other Api classes
 guard var connection = try? Connection.connect(
 	userPrivKey: userPK,
 	solutionId: solutionID,
@@ -46,7 +45,7 @@ guard var connection = try? Connection.connect(
 else {exit(1)}
 
 // InboxApi utilises both Stores and Threads, thus it requires both of them in it's constructor.
-// Each of those are created by passing a Connection as an inout argument
+// Each of those are created by passing a Connection as an inout argument to their respective create(connection:) methods.
 
 guard var threadApi = try? ThreadApi.create(
 	connection: &connection)
@@ -60,7 +59,7 @@ guard let inboxApi = try? InboxApi.create(
 	storeApi:&storeApi)
 else {exit(4)}
 
-// CryptoApi allows for cryptographic operations
+// CryptoApi allows for cryptographic operations and does not require a connection to be used.
 let cryptoApi = CryptoApi.create()
 
 // To create a new Inbox, a list of Users with their Public Keys is needed.
@@ -75,20 +74,37 @@ var usersWithPublicKeys = privmx.UserWithPubKeyVector()
 usersWithPublicKeys.push_back(UserWithPubKey(userId: userId,
 											 pubKey: try! cryptoApi.derivePublicKey(privKey: userPK)))
 
-// next, we use the list of users to create an Inbox named "My Example Inbox" in our current context,
-// with the current user as the only member and manager
-// the method also returns the inboxId of newly created inbox
 let privateMeta = Data("My Example Inbox".utf8)
 let publicMeta = Data()
 
+// Next, we use the list as both a list of users and a list of managers to create an inbox
+// passing "My Example Inbox" as its private metadata.
+// The method also returns the inboxId of newly created Inbox.
+// Passing a nill to filesConfing means the default one will be used.
 guard let newInboxId = try? inboxApi.createInbox(
 	contextId: contextId,
 	users: usersWithPublicKeys,
 	managers: usersWithPublicKeys,
 	publicMeta: publicMeta.asBuffer(),
 	privateMeta: privateMeta.asBuffer(),
-	filesConfig: nil)  else {exit(5)}
+	filesConfig: nil)
+else {exit(5)}
 
+// Now we list already present entries as a way of showcasing the difference later on,
+// since there will be none, at this point.
+guard let entries = try? inboxApi.listEntries(
+	inboxId: newInboxId,
+	pagingQuery: PagingQuery(
+		skip: 0,
+		limit: 10,
+		sortOrder: "desc",
+		lastId: nil))
+else { exit(6) }
+
+for e in entries.readItems {
+	print(e, e.entryId, e.data)
+}
+print("--------")  //separator
 
 // Next we will create an entry in the newly created inbox.
 // To do that, we will need a file to send, as well as a message.
@@ -103,26 +119,31 @@ guard let fileHandle = try? inboxApi.createFileHandle(
 	publicMeta: privmx.endpoint.core.Buffer(),
 	privateMeta: privmx.endpoint.core.Buffer(),
 	fileSize: Int64(fileToSend.count))
-else {exit(6)}
+else {exit(7)}
 
 fileHandleVector.push_back(fileHandle)
+
 // Next we can create an entry handle
 guard let entryHandle = try? inboxApi.prepareEntry(
 	inboxId: newInboxId,
 	data: messageToSend.asBuffer(),
 	inboxFileHandles: fileHandleVector,
 	userPrivKey: userPK)
-else {exit(7)}
+else {exit(8)}
 
 
 var buffer = fileToSend
+// With an entry handle we can start uploading a File.
+
 do{
-	// with an entry handle we can start sending a file
 	while !buffer.isEmpty {
 		// For the sake of the example we will send the file in 256 byte chunks, normally the chunks are much bigger
 		let chunk = Data(buffer.prefix(256))
 		
-		try inboxApi.writeToFile(inboxHandle: entryHandle, inboxFileHandle: fileHandle, dataChunk: chunk.asBuffer())
+		try inboxApi.writeToFile(
+			inboxHandle: entryHandle,
+			inboxFileHandle: fileHandle,
+			dataChunk: chunk.asBuffer())
 		buffer = buffer.advanced(by: min(256,buffer.count))
 	}
 } catch {
@@ -134,37 +155,34 @@ do{
 }
 
 do{
-	// after sending all of the files the whole entry can be sent.
+	// After sending all of the files the whole entry can be sent.
 	try inboxApi.sendEntry(inboxHandle: entryHandle)
 }catch let err as PrivMXEndpointError{
 	print(err.getCode() as Any,err.getMessage(),err.getName())
 }
 
-//now we retrieve the list of entries, which includes the newly sent one.
-// this returns an IboxEntryList structure, that contains a C++ vector of Entrires
+// Now we retrieve the list of entries, which includes the newly sent one.
+// This returns an IboxEntryList structurecontaining a C++ vector of Entrires
 guard let entryList = try? inboxApi.listEntries(
 	inboxId: newInboxId,
 	pagingQuery: PagingQuery(skip:0,
 							 limit: 10,
 							 sortOrder: "desc",
 							 lastId: nil))
-else {exit(8)}
+else {exit(9)}
 
 
-// at last, we print out the entries we retrieved, including the newly sent one.
+// At last, we print out the entries we retrieved, including the newly sent one.
 for entry in entryList.readItems{
 	print(entry.entryId, entry.data)
 }
 
-// at this point there should be only one entry, with a single file
-// let's download that file to a buffer
+// At this point there should be only one entry, with a single file
+// let's download that file to a buffer and compare it with the data we sent
 
 guard let file = entryList.readItems.first?.files.first else {exit(9)}
 
 var downloadedData: Data = Data()
-
-
-
 
 let fileHandleForReading = try inboxApi.openFile(fileId: file.info.fileId)
 
@@ -177,7 +195,7 @@ repeat{
 
 _ = try inboxApi.closeFile(fileHandle: fileHandleForReading)
 
-print(downloadedData)
+print(downloadedData == fileToSend)
 
 // This is the helper extension for converting Data to privmx.endpoint.core.Buffer and back
 extension Data {

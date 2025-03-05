@@ -27,19 +27,19 @@ print("High-Level Inbox Example")
 //.setCertsPath(_:) on an instance of PrivMXEndpointContainer
 // or by calling `try Connection.setCertsPath(certPath)`
 
-// In this example we assume that you have already created a context
-// and added a user (whose private key you used for connection) to it
+// In this example we assume that a context already exists
+// and a user (whose private key is used for connection) has been added to it
 let userId = "YourUserIDGoesHere"
 let userPK = "PrivateKeyOfTheUserInWIFFormatGoesHere"
-let solutionID = "TheIdOfYourSolutionGoesHere"  // The Id of your Solution
-let bridgeURL = "Address.Of.The.Bridge:GoesHere"  // The address of the Platform Bridge,
-let contextId = "TheIdOfYourContextGoesHere"
-// Optionally to get a contextId you can call endpoint.connection.listContexts(basedOn:)
-// that will return a list of contexts to which the current user has been added
+let solutionID = "TheIdOfYourSolutionGoesHere"
+let bridgeURL = "Address.Of.The.Bridge:GoesHere"
 
-// We create an PrivMXEndpoint instance,
-// in real-world scenrio you'd be using a PrivMXEndpointContainer to manage PrivMXEndpoints as well as handle the event loop.
-// For this example instancing this class directly will suffice.
+let contextId = "TheIdOfYourContextGoesHere"
+
+// We create an PrivMXEndpoint instance.
+// In a real-world scenario you'd be using a PrivMXEndpointContainer to manage PrivMXEndpoints as well as handle the event loop,
+// but since we aren't councerned with real time updates or multiple connections in this example,
+// instancing this class directly will suffice.
 guard var endpoint = try? PrivMXEndpoint.init(
 		modules: [.inbox],
 		userPrivKey: userPK,
@@ -65,9 +65,10 @@ let privateMeta = Data("My Example Inbox".utf8)
 guard var inboxApi = endpoint.inboxApi
 else { exit(2) }
 
-// next, we use the list as both a list of users and a list of managers to create an inbox
-// we pass "My Example Inbox" as its private metadata in our current context,
-// the method also returns the inboxId of newly created Inbox
+// Next, we use the list as both a list of users and a list of managers to create an inbox
+// passing "My Example Inbox" as its private metadata.
+// The method also returns the inboxId of newly created Inbox.
+// The nills passed for FilesConfig and Policies mean that the default values will be used.
 guard let inboxId = try? inboxApi.createInbox(
 		in: contextId,
 		for: usersWithPublicKeys,
@@ -79,8 +80,8 @@ guard let inboxId = try? inboxApi.createInbox(
 else { exit(3) }
 
 
-// Now,as a way of showcasing the difference later on, we list already present entries.
-// Obviously, there will be none, as this is a newly created Inbox
+// Now we list already present entries as a way of showcasing the difference later on,
+// since there will be none, at this point.
 guard let entries = try? inboxApi.listEntries(
 	from: inboxId,
 	basedOn: PagingQuery(
@@ -97,11 +98,10 @@ print("--------")  //separator
 // To create an entry we need to prepare the files to be sent in that entry
 var files = [any FileDataSource]()
 
-// An entry can contain no files, but for the sake of this example we'll send one from a buffer
+// An entry can contain no files, but for the sake of this example we'll send one from a buffer.
 let fileToSend = Data(String(repeating: "#", count: 1024).utf8)
 let messageToSend = Data("This is an entry sent @ \(Date.now)".utf8)
 
-// Alternatively we could use a `FileHandleDataSource` instance that uses a file from the disk insetad
 files.append(
 	BufferDataSource(
 		buffer: fileToSend,
@@ -110,17 +110,18 @@ files.append(
 		size: Int64(fileToSend.count)))
 
 // Next we create the handler for creating and sending the entry
-// This also can be done anonymously by passing `nil` instead of the user key.
+// The "as:" parameter takes in a private key, from which a public key wil be derived
+// to allow for addressing eventual responses to the entry
 guard var entryHandler = try? InboxEntryHandler.prepareInboxEntryHandler(
-	using: inboxApi,  // instance of PrivMXInbox
-	in: inboxId,  // id of the Inbox to which the Entry will be sent
-	containing: messageToSend,  // Data sent in the entry
-	sending: files,  // List of files to send
-	as: userPK)  // as who will the inbox entry be created
+	using: inboxApi,
+	in: inboxId,
+	containing: messageToSend,
+	sending: files,
+	as: userPK)
 else { exit(5) }
 
-// Now we start the process of sending the files
-// in a real-world scenarion this would happen on a separate thread,
+// Now we start the process of sending the files.
+// In a real-world scenario this would happen on a separate thread,
 // but since the data to be sent is miniscule here, we can afford to do this synchronously.
 
 var ehState : InboxEntryHandlerState
@@ -136,7 +137,7 @@ do{
 		  ,separator: "\n|")
 }
 
-//we ensure the files were sent, before we finalize sending the entry
+// We ensure the files were sent, before we finalize sending the entry.
 guard .filesSent == ehState
 else { exit(6) }
 
@@ -145,6 +146,7 @@ do {
 	try entryHandler.sendEntry()
 } catch { exit(7) }
 
+// After that we can list the entries in the Inbox, to see the sent Entry
 guard let entries2 = try? inboxApi.listEntries(
 		from: inboxId,
 		basedOn: PagingQuery(
@@ -159,8 +161,9 @@ for en in entries2.readItems {
 	print(en.entryId,(try? String(decoding:Data(from:en.data), as: UTF8.self)) ?? "ERROR decoding data")
 }
 
-// Now let us download one of the files associated with an entry.
-// For that we will need an ID of the file to download
+// Now we'll download one of the files associated with an entry.
+// For that we need an ID of the file to download.
+// We can retrieve it from the entry's list of Files.
 let eid :privmx.endpoint.inbox.InboxEntry? = entries2.readItems.first
 let fileID = eid?.files.first?.id
 
@@ -168,7 +171,7 @@ nonisolated(unsafe) var downloadedData:Data = Data()
 nonisolated(unsafe) var threadDone = false//hacky solution to using async function in main
 
 // There are 2 ways to download provided by the high-level wrapper: using an async PrivMXEndpoint method,
-// or by creating the handler directly
+// or by creating the handler and using it directly.
 // For the sake of this example, we'll be using the async method and waiting for it to execute
 Task.detached(){
 	downloadedData = (try await endpoint.startDownloadingToBufferFromInbox(from: fileID!))
