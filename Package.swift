@@ -11,11 +11,11 @@ let package = Package(
     dependencies: [
 		.package(
 			url: "https://github.com/simplito/privmx-endpoint-swift-extra",
-			.upToNextMinor(from:.init(2, 1, 0,prereleaseIdentifiers: ["rc4"]))
+			.upToNextMinor(from:.init(2, 2, 1))
 		),
 		.package(
 			url: "https://github.com/simplito/privmx-endpoint-swift",
-			.upToNextMinor(from:.init(2, 1, 0,prereleaseIdentifiers: ["rc1"]))
+			.upToNextMinor(from:.init(2, 2, 1))
 		),
     ],
     targets: [
