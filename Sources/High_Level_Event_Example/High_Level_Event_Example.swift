@@ -55,7 +55,7 @@ struct High_Level_Event_Example{
 		// Thus we create one.
 		var usersWithPublicKeys = [privmx.endpoint.core.UserWithPubKey]()
 		
-		// Since events are ephemeral, if the recipents haven't registered for Events from particular they wont ever receive it.
+		// Recipients unregistered for specific events will not receive notifications about them.
 		// Threfore we need to register for this event.
 		try? endpoint.registerCallback(
 			for: privmx.endpoint.event.ContextCustomEvent.self,
