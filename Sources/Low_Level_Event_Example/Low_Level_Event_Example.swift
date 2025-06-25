@@ -44,16 +44,21 @@ struct Low_Level_Event_Example{
 				userPrivKey: userPK, solutionId: solutionID, bridgeUrl: bridgeURL)
 		else { exit(1) }
 		
-		// StoreApi is used for creating Stores as well as reading and creating Files within Stores
+		// EventApi is used for emitting and handling CustomEvents.
 		// We initialise an instance of it with a connection, passed as an inout argument
-		guard let storeApi = try? StoreApi.create(connection: &connection) else { exit(1) }
+		guard let eventApi = try? EventApi.create(connection: &connection) else { exit(1) }
+		
+		
 		
 		// CryptoApi allows for cryptographic operations and does not require a connection to be used.
 		let cryptoApi = CryptoApi.create()
 		
-		// To create a new Store, a list of Users with their Public Keys is needed.
-		// Thus we create one that will be used for both users and managers
-		// (typically those lists won't be identical)
+		// Recipients unregistered for specific events will not receive notifications about them.
+		// Threfore we need to register for this event.
+		try eventApi.subscribeForCustomEvents(contextId: contextId, channelName: "CHANNEL_NAME")
+		
+		// To emit a CustomEvent, a list of Users with their Public Keys is needed.
+		// Thus we create one.
 		var usersWithPublicKeys = privmx.UserWithPubKeyVector()
 		
 		// We add the current user to the list (in real world it should be a list of all participants).
@@ -64,71 +69,37 @@ struct Low_Level_Event_Example{
 				userId: userId,
 				pubKey: try! cryptoApi.derivePublicKey(privKey: userPK)))
 		
-		guard let privateMeta = "My Example Store".data(using: .utf8) else { exit(2) }
-		let publicMeta = Data()
+		guard let payload = "My Custom Event".data(using: .utf8) else { exit(2) }
+
+		try eventApi.emitEvent(
+			contextId: contextId,
+			users: usersWithPublicKeys,
+			channelName: "CHANNEL_NAME",
+			eventData: payload.asBuffer())
 		
-		// Next, we use the list as both a list of users and a list of managers to create a Store,
-		// passing "My Example Inbox" as its private metadata.
-		// The method also returns the storeId of newly created Inbox.
-		// Passing a nil to filesConfig means the default one will be used.
-		guard
-			let newStoreId = try? storeApi.createStore(
-				contextId: contextId,
-				users: usersWithPublicKeys,
-				managers: usersWithPublicKeys,
-				publicMeta: publicMeta.asBuffer(),
-				privateMeta: privateMeta.asBuffer())
-		else { exit(3) }
+		// Since the event has been emitted and we registered for custom events from this combination of contextId and channelName
+		// we now can now retrieve it and handle it appropriately.
+		// To do so, we get an instance of EventQueue.
+		guard let eventQueue = try? EventQueue.getInstance() else {exit(3)}
 		
-		let fileToSend = Data(String(repeating: "#", count: 1024).utf8)
-		
-		let writeFileHandle = try storeApi.createFile(
-			storeId: newStoreId,
-			publicMeta: privmx.endpoint.core.Buffer(),
-			privateMeta: privmx.endpoint.core.Buffer(),
-			size: 1024)
-		var buffer = fileToSend
-		// with an entry handle we can start sending a file
-		while !buffer.isEmpty {
-			// For the sake of the example we will send the file in 256 byte chunks, normally the chunks are much bigger
-			let chunk = Data(buffer.prefix(256))
+		// Since getEvent retrieves the first event in the queue (or nothig should the queue be empty at the time)
+		// we call it here in a while loop, to handle any previous events (like the ones that arrive upon connecting)
+		while let eventHolder = try eventQueue.getEvent(){
+			// The queue is shared between all connections, so normally you'd have to handle that yourself,
+			// for this example there's only one connection however, so we skip that step. We would do that by checking the connectionId in the eventHolder.
 			
-			try storeApi.writeToFile(handle: writeFileHandle, dataChunk: chunk.asBuffer())
-			buffer = buffer.advanced(by: min(256, buffer.count))
+			// Next we check if the eventHolder contains a CustomEvent.
+			if try EventHandler.isContextCustomEvent(eventHolder: eventHolder){
+				// If it does, we extract it, and can finally handle it appropriately.
+				let event = try EventHandler.extractContextCustomEvent(eventHolder: eventHolder)
+				
+				// For this example we'll settle for simply printing out the payload.
+				print(String(decoding: try Data(from:event.data.payload), as: UTF8.self))
+				
+			}
+			
 		}
 		
-		let newFileID = try storeApi.closeFile(handle: writeFileHandle)
-		
-		// We again list the Files in the store and print them, this time the list contains a new file.
-		// Note that this does not download the actual files, but only their descriptions.
-		guard
-			let filesList = try? storeApi.listFiles(
-				storeId: newStoreId,
-				pagingQuery: PagingQuery(
-					skip: 0,
-					limit: 10,
-					sortOrder: "desc",
-					lastId: nil,
-					queryAsJson: nil
-				))
-		else { exit(4) }
-		
-		guard let fileId = filesList.readItems.first?.info.fileId
-		else { exit(5) }
-		var downloadedData: Data = Data()
-		
-		let fileHandle = try storeApi.openFile(fileId: fileId)
-		
-		var chunk = Data()
-		
-		repeat {
-			chunk = try Data(from: storeApi.readFromFile(handle: fileHandle, length: 512))
-			downloadedData.append(chunk)
-		} while chunk.count == 512
-		
-		_ = try storeApi.closeFile(handle: fileHandle)
-		
-		print(downloadedData)
 	}
 }
 		// This is the helper extension for converting Data to privmx.endpoint.core.Buffer and back

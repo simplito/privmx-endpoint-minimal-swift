@@ -70,7 +70,7 @@ struct High_Level_Event_Example{
 		// And now we start the event loop.
 		 try? await endpointContainer.startListening()
 		
-		// We add the current user to the list (in real world it should be a list of all participants).
+		// We add the current user to the list (in real world it should be a list of all users that are supposed to receive the event).
 		// The public key in this particular case can be derived from the private key,
 		// but in typical circumstance should be acquired from an outside source (like your authorisation server)
 		usersWithPublicKeys.append(

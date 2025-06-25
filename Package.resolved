@@ -1,13 +1,13 @@
 {
-  "originHash" : "52b26a9030b5b1099b06010c033ceef6eec23af66f03ca856be9c612556897dd",
+  "originHash" : "7d600982503ba1fa330546a9b7f57694c025b0d5eab6fe1e4afb6e4feb63ed32",
   "pins" : [
     {
       "identity" : "privmx-endpoint-swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/simplito/privmx-endpoint-swift",
       "state" : {
-        "revision" : "aed8b62967e87b12084087ea22dd24e3a267f659",
-        "version" : "2.3.0-rc5"
+        "revision" : "746ca1094feec0236b7995ecaf4d5731b793f5bc",
+        "version" : "2.3.0-rc6"
       }
     },
     {
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/simplito/privmx-endpoint-swift-extra",
       "state" : {
-        "revision" : "8ed804bf9378114833ba809e81c53cd1b8c73b57",
-        "version" : "2.3.0-rc6"
+        "revision" : "ee90c64e0abf4af0104d02f5344f936ea225fab7",
+        "version" : "2.3.0-rc7"
       }
     }
   ],
