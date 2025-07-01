@@ -22,7 +22,7 @@ struct Low_Level_Event_Example{
 		typealias UserWithPubKey = privmx.endpoint.core.UserWithPubKey  //for brevity
 		typealias PagingQuery = privmx.endpoint.core.PagingQuery  //for brevity
 		
-		print("Low-Level Store Example")
+		print("Low-Level Event Example")
 		
 		// This example assumes that the bridge is hosted locally, which removes the necessity of setting ssl certificates
 		// in a real-world scenario a certificate that will be used by OpenSSL for the connection needs to be provided.
@@ -78,7 +78,7 @@ struct Low_Level_Event_Example{
 			eventData: payload.asBuffer())
 		
 		// Since the event has been emitted and we registered for custom events from this combination of contextId and channelName
-		// we now can now retrieve it and handle it appropriately.
+		// we can now retrieve it and handle it appropriately.
 		// To do so, we get an instance of EventQueue.
 		guard let eventQueue = try? EventQueue.getInstance() else {exit(3)}
 		
