@@ -54,7 +54,7 @@ struct Low_Level_Event_Example{
 		let cryptoApi = CryptoApi.create()
 		
 		// Recipients unregistered for specific events will not receive notifications about them.
-		// Threfore we need to register for this event.
+		// Therefore we need to register for this event.
 		try eventApi.subscribeForCustomEvents(contextId: contextId, channelName: "CHANNEL_NAME")
 		
 		// To emit a CustomEvent, a list of Users with their Public Keys is needed.
