@@ -11,11 +11,11 @@ let package = Package(
     dependencies: [
 		.package(
 			url: "https://github.com/simplito/privmx-endpoint-swift-extra",
-			.upToNextMinor(from:.init(2, 3, 0))
+			.upToNextMinor(from:.init(2, 5, 0,prereleaseIdentifiers: ["rc5"]))
 		),
 		.package(
 			url: "https://github.com/simplito/privmx-endpoint-swift",
-			.upToNextMinor(from:.init(2, 3, 0))
+			.upToNextMinor(from:.init(2, 5, 0,prereleaseIdentifiers: ["rc3"]))
 		),
     ],
     targets: [
@@ -47,7 +47,7 @@ let package = Package(
 			],
 			swiftSettings: [.interoperabilityMode(.Cxx)]
 		),
-.executableTarget(
+		.executableTarget(
             name: "Low_Level_Store_Example",
             dependencies: [
 				.product(name: "PrivMXEndpointSwift", package: "privmx-endpoint-swift"),
@@ -61,7 +61,7 @@ let package = Package(
 			],
 			swiftSettings: [.interoperabilityMode(.Cxx)]
 		),
-.executableTarget(
+		.executableTarget(
             name: "Low_Level_Inbox_Example",
             dependencies: [
 				.product(name: "PrivMXEndpointSwift", package: "privmx-endpoint-swift"),
@@ -70,6 +70,20 @@ let package = Package(
         ),
 		.executableTarget(
 			name: "High_Level_Inbox_Example",
+			dependencies: [
+				.product(name: "PrivMXEndpointSwiftExtra", package: "privmx-endpoint-swift-extra"),
+			],
+			swiftSettings: [.interoperabilityMode(.Cxx)]
+		),
+		.executableTarget(
+			name: "Low_Level_Kvdb_Example",
+			dependencies: [
+				.product(name: "PrivMXEndpointSwift", package: "privmx-endpoint-swift"),
+			],
+			swiftSettings: [.interoperabilityMode(.Cxx)]
+		),
+		.executableTarget(
+			name: "High_Level_Kvdb_Example",
 			dependencies: [
 				.product(name: "PrivMXEndpointSwiftExtra", package: "privmx-endpoint-swift-extra"),
 			],
