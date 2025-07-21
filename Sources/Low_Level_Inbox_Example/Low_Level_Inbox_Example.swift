@@ -102,6 +102,7 @@ struct Low_Level_Inbox_Example{
 				limit: 10,
 				sortOrder: "desc",
 				lastId: nil,
+				sortBy: nil,
 				queryAsJson: nil
 			))
 		else { exit(6) }
@@ -174,6 +175,7 @@ struct Low_Level_Inbox_Example{
 									 limit: 10,
 									 sortOrder: "desc",
 									 lastId: nil,
+									 sortBy: nil,
 									queryAsJson: nil))
 		else {exit(9)}
 		

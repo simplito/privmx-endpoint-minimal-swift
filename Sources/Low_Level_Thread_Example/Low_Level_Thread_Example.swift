@@ -101,6 +101,7 @@ struct Low_Level_Thread_Example{
 					limit: 10,
 					sortOrder: "desc",
 					lastId: nil,
+					sortBy: nil,
 					queryAsJson: nil
 				))
 		else { exit(1) }
@@ -130,6 +131,7 @@ struct Low_Level_Thread_Example{
 					limit: 10,
 					sortOrder: "desc",
 					lastId: nil,
+					sortBy: nil,
 					queryAsJson: nil
 				))
 		else { exit(1) }

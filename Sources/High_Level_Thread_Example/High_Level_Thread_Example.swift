@@ -15,8 +15,8 @@ import PrivMXEndpointSwiftExtra
 import PrivMXEndpointSwiftNative
 
 @main
-struct High_Level_Event_Example{
-	public static func main() async throws{
+struct High_Level_Thread_Example{
+	public static func main() async throws {
 		
 		typealias UserWithPubKey = privmx.endpoint.core.UserWithPubKey  //for brevity
 		typealias PagingQuery = privmx.endpoint.core.PagingQuery  //for brevity
