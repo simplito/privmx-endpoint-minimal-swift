@@ -24,7 +24,7 @@ struct Low_Level_Kvdb_Example{
 		
 		print("Low-Level KVDB Example")
 		
-		// This example assumes that the bridge is hosted locally, which removes the necessity of setting ssl certificates
+		// This example assumes that the bridge is hosted locally, so setting SSL certificates in not needed
 		// in a real-world scenario a certificate that will be used by OpenSSL for the connection needs to be provided.
 		// let certPath std.string = "/Path/to/the/certificate.file"
 		

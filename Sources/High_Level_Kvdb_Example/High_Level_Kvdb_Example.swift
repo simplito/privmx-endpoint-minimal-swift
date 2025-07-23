@@ -23,7 +23,7 @@ struct High_Level_Kvdb_Example{
 		
 		print("High-Level KVDB Example")
 		
-		// This example assumes that the bridge is hosted locally, which removes the necessity of setting ssl certificates
+		// This example assumes that the bridge is hosted locally, so setting SSL certificates in not needed
 		// in a real-world scenario a certificate that will be used by OpenSSL for the connection needs to be provided.
 		// let certPath = "/Path/to/the/certificate.file"
 		
@@ -53,8 +53,8 @@ struct High_Level_Kvdb_Example{
 		else { exit(1) }
 		
 		// To create a new Kvdb, a list of Users with their Public Keys is needed.
-		// Thus we create one that will be used for both users and managers
-		// (typically those lists won't be identical)
+		// In this example, one list will be used for both users and managers
+		// (in other cases those lists won't be identical).
 		var usersWithPublicKeys = [privmx.endpoint.core.UserWithPubKey]()
 		
 		// We add the current user to the list (in real world it should be a list of all participants).
