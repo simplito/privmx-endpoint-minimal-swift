@@ -109,6 +109,7 @@ struct Low_Level_Store_Example{
 					limit: 10,
 					sortOrder: "desc",
 					lastId: nil,
+					sortBy: nil,
 					queryAsJson: nil
 				))
 		else { exit(4) }

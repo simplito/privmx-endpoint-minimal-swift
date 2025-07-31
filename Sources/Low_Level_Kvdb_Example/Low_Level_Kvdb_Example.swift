@@ -14,7 +14,7 @@ import PrivMXEndpointSwift
 import PrivMXEndpointSwiftNative
 
 @main
-struct Low_Level_Thread_Example{
+struct Low_Level_Kvdb_Example{
 	public static func main() async throws{
 		
 		// The wrapper uses Cpp types like std::string (which is imported as std.string or std.__1.string in swift)
@@ -22,9 +22,9 @@ struct Low_Level_Thread_Example{
 		typealias UserWithPubKey = privmx.endpoint.core.UserWithPubKey  //for brevity
 		typealias PagingQuery = privmx.endpoint.core.PagingQuery  //for brevity
 		
-		print("Low-Level Thread Example")
+		print("Low-Level KVDB Example")
 		
-		// This example assumes that the bridge is hosted locally, which removes the necessity of setting ssl certificates
+		// This example assumes that the bridge is hosted locally, so setting SSL certificates in not needed
 		// in a real-world scenario a certificate that will be used by OpenSSL for the connection needs to be provided.
 		// let certPath std.string = "/Path/to/the/certificate.file"
 		
@@ -45,9 +45,9 @@ struct Low_Level_Thread_Example{
 				userPrivKey: userPK, solutionId: solutionID, bridgeUrl: bridgeURL)
 		else { exit(1) }
 		
-		// ThreadApi instance is initialised with a connection, passed as an inout argument
-		// ThreadApi is used for creating threads as well as reading and creating messages within threads
-		guard let threadApi = try? ThreadApi.create(connection: &connection) else { exit(1) }
+		// KvdbApi instance is initialised with a connection, passed as an inout argument
+		// KvdbApi is used for creating kvdbs as well as reading and creating entries within kvdbs
+		guard let kvdbApi = try? KvdbApi.create(connection: &connection) else { exit(1) }
 		
 		// CryptoApi allows for cryptographic operations
 		let cryptoApi = CryptoApi.create()
@@ -63,14 +63,14 @@ struct Low_Level_Thread_Example{
 				userId: userId,
 				pubKey: try! cryptoApi.derivePublicKey(privKey: userPK)))
 		
-		// next, we use the list of users to create a thread named "My Example Thread" in our current context,
+		// next, we use the list of users to create a kvdb named "My Example KVDB" in our current context,
 		// with the current user as the only member and manager
-		// the method also returns the threadId of newly created thread
-		guard let privateMeta = "My Example Thread".data(using: .utf8) else { exit(1) }
+		// the method also returns the kvdbId of newly created kvdb
+		guard let privateMeta = "My Example KVDB".data(using: .utf8) else { exit(1) }
 		let publicMeta = Data()
 		
 		guard
-			let newThreadId = try? threadApi.createThread(
+			let newKvdbId = try? kvdbApi.createKvdb(
 				contextId: contextId,
 				users: usersWithPublicKeys,
 				managers: usersWithPublicKeys,
@@ -78,24 +78,25 @@ struct Low_Level_Thread_Example{
 				privateMeta: privateMeta.asBuffer())
 		else { exit(1) }
 		
-		let messageToSend = "Hello World @ \(Date.now) !"
-		guard let messageAsBuffer = messageToSend.data(using: .utf8)?.asBuffer() else { exit(1) }
+		let entryToSend = "Hello World @ \(Date.now) !"
+		guard let entryAsBuffer = entryToSend.data(using: .utf8)?.asBuffer() else { exit(1) }
 		
-		// this creates a new message in the specified thread, in this case the newly created one
-		// the returned string is the messageId of the newly created message
-		let newMessageId = try! threadApi.sendMessage(
-			threadId: newThreadId,
+		// Entries are created for a particular pair of KVDB and key, where key acts as an identifier within that Kvdb.
+		let entryKey :std.string = "example"
+		
+		// this creates a new entry in the specified kvdb, in this case the newly created one
+		try kvdbApi.setEntry(
+			kvdbId: newKvdbId,
+			key: entryKey,
 			publicMeta: privmx.endpoint.core.Buffer(),
 			privateMeta: privmx.endpoint.core.Buffer(),
-			data: messageAsBuffer)
+			data: entryAsBuffer)
 		
-		print("New message id: ", String(newMessageId))  // the id of newly created message
-		
-		//now we retrieve the list of messages, which includes the newly sent message.
-		// this returns a threadMessagesList structure, that contains a vector of threadMessages, as well as the total number of messages in thread
+		//now we retrieve the list of entries, which includes the newly set entry.
+		// this returns a kvdbEntriesList object, that contains a vector of kvdbEntries, as well as the total number of entries in the kvdb
 		guard
-			let messagesList = try? threadApi.listMessages(
-				threadId: newThreadId,
+			let entriesList = try? kvdbApi.listEntries(
+				kvdbId: newKvdbId,
 				pagingQuery: PagingQuery(
 					skip: 0,
 					limit: 10,
@@ -106,26 +107,28 @@ struct Low_Level_Thread_Example{
 				))
 		else { exit(1) }
 		
-		// at last, we print out the messages we retrieved, including the newly sent one
-		for message in messagesList.readItems {
-			print(message.info.messageId, message.data.getString() ?? "")
+		// at last, we print out the entries we retrieved, including the new one
+		for entry in entriesList.readItems {
+			print(entry.info.key, entry.data.getString() ?? "")
 		}
 		
 		print("---- update -----")
 		
-		let updatedMessage = "Old message was \"\(messageToSend)\", now it's this @ \(Date.now) !"
-		guard let updatedMessageAsBuffer = updatedMessage.data(using: .utf8)?.asBuffer() else { exit(1) }
+		let updatedEntry = "Old entry was \"\(entryToSend)\", now it's this @ \(Date.now) !"
+		guard let updatedEntryAsBuffer = updatedEntry.data(using: .utf8)?.asBuffer() else { exit(1) }
 		
-		try! threadApi.updateMessage(
-			messageId: newMessageId,
+		try! kvdbApi.setEntry(
+			kvdbId: newKvdbId,
+			key:entryKey,
 			publicMeta: privmx.endpoint.core.Buffer(),
 			privateMeta: privmx.endpoint.core.Buffer(),
-			data: updatedMessageAsBuffer)
+			data: updatedEntryAsBuffer,
+			version: 1)
 		
-		//now we retrieve the new list of messages, which includes the newly updated message.
+		//now we retrieve the new list of entries, which includes the newly updated entry.
 		guard
-			let messagesList2 = try? threadApi.listMessages(
-				threadId: newThreadId,
+			let entriesList2 = try? kvdbApi.listEntries(
+				kvdbId: newKvdbId,
 				pagingQuery: PagingQuery(
 					skip: 0,
 					limit: 10,
@@ -136,9 +139,9 @@ struct Low_Level_Thread_Example{
 				))
 		else { exit(1) }
 		
-		// and print out the messages we retrieved
-		for m in messagesList2.readItems {
-			print(m.info.messageId, m.data.getString() ?? "")
+		// and print out the entries we retrieved
+		for m in entriesList2.readItems {
+			print(m.info.key, m.data.getString() ?? "")
 		}
 	}
 }
