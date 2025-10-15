@@ -55,7 +55,13 @@ struct Low_Level_Event_Example{
 		
 		// Recipients unregistered for specific events will not receive notifications about them.
 		// Therefore we need to register for this event.
-		try eventApi.subscribeForCustomEvents(contextId: contextId, channelName: "CHANNEL_NAME")
+		guard let subscription = try? eventApi.buildSubscriptionQuery(
+			channelName: "CHANNEL_NAME",
+			selectorType: privmx.endpoint.event.CONTEXT_ID,
+			selectorId: contextId)
+		else{ exit(2)}
+		
+		let subscriptionIds = try eventApi.subscribeFor(subscriptionQueries: [subscription])
 		
 		// To emit a CustomEvent, a list of Users with their Public Keys is needed.
 		// Thus we create one.
@@ -69,7 +75,7 @@ struct Low_Level_Event_Example{
 				userId: userId,
 				pubKey: try! cryptoApi.derivePublicKey(privKey: userPK)))
 		
-		guard let payload = "My Custom Event".data(using: .utf8) else { exit(2) }
+		guard let payload = "My Custom Event".data(using: .utf8) else { exit(3) }
 
 		try eventApi.emitEvent(
 			contextId: contextId,
@@ -80,7 +86,7 @@ struct Low_Level_Event_Example{
 		// Since the event has been emitted and we registered for custom events from this combination of contextId and channelName
 		// we can now retrieve it and handle it appropriately.
 		// To do so, we get an instance of EventQueue.
-		guard let eventQueue = try? EventQueue.getInstance() else {exit(3)}
+		guard let eventQueue = try? EventQueue.getInstance() else {exit(4)}
 		
 		// Since getEvent retrieves the first event in the queue (or nothig should the queue be empty at the time)
 		// we call it here in a while loop, to handle any previous events (like the ones that arrive upon connecting)

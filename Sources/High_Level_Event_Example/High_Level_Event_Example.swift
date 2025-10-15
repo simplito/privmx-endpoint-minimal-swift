@@ -58,14 +58,14 @@ struct High_Level_Event_Example{
 		// Recipients unregistered for specific events will not receive notifications about them.
 		// Threfore we need to register for this event.
 		try? endpoint.registerCallback(
-			for: privmx.endpoint.event.ContextCustomEvent.self,
-			from: .custom(contextId: contextId, name: "CHANNEL_NAME"),
-			identified: ""){
-				data in
-				if let data = data as? privmx.endpoint.event.ContextCustomEventData {
-					print((try? data.payload.toHex()) ?? "?")
-				}
-			}
+			for: .init(
+				request: .custom(
+					channelName: "CHANNEL_NAME",
+					contextId: contextId),
+				group: "some_group"){
+					data in
+					
+			})
 		
 		// And now we start the event loop.
 		 try? await endpointContainer.startListening()

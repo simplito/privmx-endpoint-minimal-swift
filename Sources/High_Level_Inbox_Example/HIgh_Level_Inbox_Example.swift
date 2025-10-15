@@ -175,17 +175,10 @@ struct High_Level_Inbox_Example{
 		let eid: privmx.endpoint.inbox.InboxEntry? = entries2.readItems.first
 		let fileID = eid?.files.first?.id
 		
-		nonisolated(unsafe) var downloadedData: Data = Data()
-		nonisolated(unsafe) var threadDone = false  //hacky solution to using async function in main
-		
 		// There are 2 ways to download provided by the high-level wrapper: using an async PrivMXEndpoint method,
 		// or by creating the handler and using it directly.
 		// For the sake of this example, we'll be using the async method and waiting for it to execute
-		Task.detached {
-			downloadedData = (try await endpoint.startDownloadingToBufferFromInbox(from: fileID!))
-			threadDone = true
-		}
-		while !threadDone {}  //hacky solution to using async function in main
+		let downloadedData = (try await endpoint.startDownloadingToBufferFromInbox(from: fileID!))
 		
 		// And finally we print the downloaded data
 		print(downloadedData)

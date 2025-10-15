@@ -136,17 +136,11 @@ struct High_Level_Store_Example{
 		
 		print("--------")  //separator for better output readability
 		
-		nonisolated(unsafe) var downloadedData: Data = Data()
-		
 		// There are 2 ways to download provided by the high-level wrapper: using an async PrivMXEndpoint method, or by creating the handler directly
 		// For the sake of this example, we'll be using the async method and waiting for it to execute
-		threadDone = false
-		Task.detached {
-			downloadedData =
-			(try? await endpoint.startDownloadingToBuffer(from: fileId)) ?? Data("Errors Occurred".utf8)
-			threadDone = true
-		}
-		while !threadDone {}  //hacky solution to using async function in main
+		
+		let downloadedData = (try? await endpoint
+			.startDownloadingToBuffer(from: fileId)) ?? Data("Errors Occurred".utf8)
 		
 		// And finally we print the downloaded data
 		print(downloadedData)
